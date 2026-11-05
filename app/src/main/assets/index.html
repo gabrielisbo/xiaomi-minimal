@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'; connect-src 'none';" />
+  <title>Minimal Launcher</title>
+  <style>
+    :root {
+      --bg-pure: #000000;
+      --text-primary: #F2F2F2;
+      --text-muted: #787880;
+      --divider-color: rgba(255, 255, 255, 0.14);
+      --divider-style: solid;
+      --accent-ok: #F2F2F2;
+      --accent-warn: #F59E0B;
+      --accent-alert: #EF4444;
+      --font-main: 'Aspekta', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      --safe-top: env(safe-area-inset-top, 36px);
+      --safe-bottom: env(safe-area-inset-bottom, 24px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100dvh;
+      background-color: var(--bg-pure);
+      color: var(--text-primary);
+      font-family: var(--font-main);
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body.is-idle {
+      opacity: 0.35;
+      transition: opacity 0.8s ease;
+    }
+
+    .launcher {
+      display: flex;
+      width: 100vw;
+      height: 100dvh;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+      overscroll-behavior-x: contain;
+    }
+
+    .launcher::-webkit-scrollbar {
+      display: none;
+    }
+
+    .launcher__screen {
+      flex: 0 0 100vw;
+      width: 100vw;
+      height: 100dvh;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .home {
+      justify-content: space-between;
+      padding: calc(var(--safe-top) + 24px) 36px calc(var(--safe-bottom) + 20px) 36px;
+    }
+
+    .home__nav {
+      margin: auto 0;
+      width: 100%;
+    }
+
+    .home__list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px var(--divider-style) var(--divider-color);
+    }
+
+    .home__item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 2px;
+      font-size: 1.875rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      border-bottom: 1px var(--divider-style) var(--divider-color);
+      transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+
+    .home__item:active {
+      opacity: 0.4;
+      transform: translateX(4px);
+    }
+
+    .home__item-arrow {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      opacity: 0.45;
+      font-weight: 400;
+    }
+
+    .metrics {
+      width: 100%;
+      padding-top: 14px;
+      border-top: 1px solid var(--divider-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .metrics__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .metrics__label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .metrics__value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .metrics__goal {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .metrics__bar {
+      width: 100%;
+      height: 2px;
+      background-color: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .metrics__fill {
+      height: 100%;
+      width: 0%;
+      background-color: var(--accent-ok);
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    .metrics__subrow {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .drawer {
+      padding: calc(var(--safe-top) + 16px) 28px 0 36px;
+    }
+
+    .drawer__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .drawer__title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .drawer__chevron {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .drawer__settings {
+      color: var(--text-primary);
+      padding: 4px 0 4px 12px;
+    }
+
+    .drawer__settings:active {
+      opacity: 0.4;
+    }
+
+    .drawer__search {
+      display: none;
+      margin-bottom: 12px;
+    }
+
+    .drawer__search--open {
+      display: block;
+    }
+
+    .drawer__input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--text-primary);
+      color: var(--text-primary);
+      font-family: var(--font-main);
+      font-size: 1.05rem;
+      padding: 10px 0;
+      outline: none;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    .drawer__list {
+      list-style: none;
+      flex: 1;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+      padding-bottom: calc(var(--safe-bottom) + 96px);
+      padding-right: 8px;
+      border-top: 1px var(--divider-style) var(--divider-color);
+      scrollbar-width: thin;
+      scrollbar-color: var(--text-muted) transparent;
+    }
+
+    .drawer__list::-webkit-scrollbar {
+      width: 2px;
+    }
+
+    .drawer__list::-webkit-scrollbar-thumb {
+      background-color: var(--text-muted);
+    }
+
+    .drawer__item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px 2px;
+      font-size: 1.0625rem;
+      font-weight: 400;
+      color: var(--text-primary);
+      border-bottom: 1px var(--divider-style) var(--divider-color);
+      transition: opacity 0.12s ease;
+    }
+
+    .drawer__item:active {
+      opacity: 0.4;
+    }
+
+    .drawer__fab {
+      position: absolute;
+      bottom: calc(var(--safe-bottom) + 24px);
+      right: 28px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background-color: var(--bg-pure);
+      border: 1.5px solid var(--text-primary);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    .drawer__fab:active {
+      transform: scale(0.92);
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="launcher" id="launcherViewport">
+    <section class="launcher__screen home" aria-label="Tela Inicial">
+      <nav class="home__nav">
+        <ul class="home__list" id="homeList"></ul>
+      </nav>
+
+      <footer class="metrics" id="metricsBox">
+        <div class="metrics__row">
+          <span class="metrics__label">Tempo de Tela</span>
+          <div class="metrics__value">
+            <span id="usedTimeText">0h 00m</span>
+            <span class="metrics__goal" id="goalTimeText">/ 2h 00m</span>
+          </div>
+        </div>
+        <div class="metrics__bar">
+          <div class="metrics__fill" id="metricsFill"></div>
+        </div>
+        <div class="metrics__subrow">
+          <span>Sessão atual: <strong id="sessionText">00m 00s</strong></span>
+          <span id="percentText">0% da meta</span>
+        </div>
+      </footer>
+    </section>
+
+    <section class="launcher__screen drawer" aria-label="Todos os Aplicativos">
+      <header class="drawer__header">
+        <div class="drawer__title">
+          <span>Apps</span>
+          <span class="drawer__chevron">⌄</span>
+        </div>
+        <div class="drawer__settings" id="btnSettings" role="button">Settings</div>
+      </header>
+
+      <div class="drawer__search" id="searchContainer">
+        <input type="search" class="drawer__input" id="searchInput" placeholder="Filtrar aplicativo..." autocomplete="off" spellcheck="false" />
+      </div>
+
+      <ul class="drawer__list" id="drawerList"></ul>
+
+      <button type="button" class="drawer__fab" id="btnSearch" aria-label="Buscar aplicativo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    const DAILY_GOAL_MINUTES = 120;
+    let usedMinutesToday = 0;
+    let sessionSeconds = 0;
+    let sessionTimerId = null;
+    let idleTimerId = null;
+
+    const favoriteApps = [
+      { label: 'Notion', pkg: 'notion.id' },
+      { label: 'WhatsApp', pkg: 'com.whatsapp' },
+      { label: 'Photos', pkg: 'com.miui.gallery' },
+      { label: 'Camera', pkg: 'com.android.camera' },
+      { label: 'Browser', pkg: 'com.android.chrome' },
+      { label: 'Gemini', pkg: 'com.google.android.apps.bard' }
+    ];
+
+    let allApps = [...favoriteApps];
+
+    function launchApp(pkgName) {
+      resetIdleTimer();
+      if (window.AndroidBridge && typeof window.AndroidBridge.openApp === 'function') {
+        window.AndroidBridge.openApp(String(pkgName));
+      }
+    }
+
+    function syncAppsFromAndroid() {
+      if (window.AndroidBridge && typeof window.AndroidBridge.getInstalledAppsJson === 'function') {
+        try {
+          const rawJson = window.AndroidBridge.getInstalledAppsJson();
+          const parsed = JSON.parse(rawJson);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            allApps = parsed.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+          }
+        } catch (err) {
+        }
+      }
+    }
+
+    const homeListEl = document.getElementById('homeList');
+    const drawerListEl = document.getElementById('drawerList');
+
+    function createAppListItem(app, itemClass, showArrow) {
+      const li = document.createElement('li');
+      li.className = itemClass;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = app.label;
+      li.appendChild(nameSpan);
+
+      if (showArrow) {
+        const arrowSpan = document.createElement('span');
+        arrowSpan.className = 'home__item-arrow';
+        arrowSpan.textContent = '↗';
+        li.appendChild(arrowSpan);
+      }
+
+      li.addEventListener('click', () => launchApp(app.pkg));
+      return li;
+    }
+
+    function renderHome() {
+      homeListEl.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      favoriteApps.forEach(app => {
+        fragment.appendChild(createAppListItem(app, 'home__item', true));
+      });
+      homeListEl.appendChild(fragment);
+    }
+
+    function renderDrawer(filterText = '') {
+      drawerListEl.replaceChildren();
+      const query = filterText.trim().toLowerCase();
+      const filtered = allApps.filter(app => app.label.toLowerCase().includes(query));
+
+      if (query.length > 1 && filtered.length === 1) {
+        const targetPkg = filtered[0].pkg;
+        closeSearch();
+        launchApp(targetPkg);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      filtered.forEach(app => {
+        fragment.appendChild(createAppListItem(app, 'drawer__item', true));
+      });
+      drawerListEl.appendChild(fragment);
+    }
+
+    const searchContainer = document.getElementById('searchContainer');
+    const searchInput = document.getElementById('searchInput');
+    const btnSearch = document.getElementById('btnSearch');
+    const launcherViewport = document.getElementById('launcherViewport');
+
+    function closeSearch() {
+      searchInput.value = '';
+      searchInput.blur();
+      searchContainer.classList.remove('drawer__search--open');
+      renderDrawer('');
+    }
+
+    btnSearch.addEventListener('click', () => {
+      const isOpen = searchContainer.classList.toggle('drawer__search--open');
+      if (isOpen) {
+        searchInput.focus();
+      } else {
+        closeSearch();
+      }
+    });
+
+    searchInput.addEventListener('input', (e) => renderDrawer(e.target.value));
+
+    drawerListEl.addEventListener('touchmove', () => {
+      if (document.activeElement === searchInput) {
+        searchInput.blur();
+      }
+    }, { passive: true });
+
+    document.getElementById('btnSettings').addEventListener('click', () => {
+      launchApp('com.android.settings');
+    });
+
+    window.handleAndroidBack = function() {
+      if (searchContainer.classList.contains('drawer__search--open')) {
+        closeSearch();
+        return true;
+      }
+      if (launcherViewport.scrollLeft > 50) {
+        launcherViewport.scrollTo({ left: 0, behavior: 'smooth' });
+        return true;
+      }
+      return false;
+    };
+
+    const usedTimeText = document.getElementById('usedTimeText');
+    const goalTimeText = document.getElementById('goalTimeText');
+    const metricsFill = document.getElementById('metricsFill');
+    const sessionText = document.getElementById('sessionText');
+    const percentText = document.getElementById('percentText');
+
+    function formatHoursMinutes(totalMins) {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${h}h ${String(m).padStart(2, '0')}m`;
+    }
+
+    function updateScreenTimeUI() {
+      if (window.AndroidBridge && typeof window.AndroidBridge.getTodayScreenTimeMinutes === 'function') {
+        usedMinutesToday = Number(window.AndroidBridge.getTodayScreenTimeMinutes()) || 0;
+      }
+
+      const totalMinutesWithSession = usedMinutesToday + Math.floor(sessionSeconds / 60);
+      const pct = Math.min(100, Math.round((totalMinutesWithSession / DAILY_GOAL_MINUTES) * 100));
+      const realPct = Math.round((totalMinutesWithSession / DAILY_GOAL_MINUTES) * 100);
+
+      usedTimeText.textContent = formatHoursMinutes(totalMinutesWithSession);
+      goalTimeText.textContent = `/ ${formatHoursMinutes(DAILY_GOAL_MINUTES)}`;
+      percentText.textContent = `${realPct}% da meta`;
+      metricsFill.style.width = `${pct}%`;
+
+      if (realPct >= 100) {
+        metricsFill.style.backgroundColor = 'var(--accent-alert)';
+      } else if (realPct >= 80) {
+        metricsFill.style.backgroundColor = 'var(--accent-warn)';
+      } else {
+        metricsFill.style.backgroundColor = 'var(--accent-ok)';
+      }
+    }
+
+    function updateSessionClock() {
+      sessionSeconds++;
+      const m = Math.floor(sessionSeconds / 60);
+      const s = sessionSeconds % 60;
+      sessionText.textContent = `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+      if (sessionSeconds % 60 === 0) {
+        updateScreenTimeUI();
+      }
+    }
+
+    function startActiveSession() {
+      stopActiveSession();
+      updateScreenTimeUI();
+      sessionTimerId = setInterval(updateSessionClock, 1000);
+    }
+
+    function stopActiveSession() {
+      if (sessionTimerId !== null) {
+        clearInterval(sessionTimerId);
+        sessionTimerId = null;
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        sessionSeconds = 0;
+        sessionText.textContent = '00m 00s';
+        startActiveSession();
+        resetIdleTimer();
+      } else {
+        stopActiveSession();
+      }
+    });
+
+    function resetIdleTimer() {
+      document.body.classList.remove('is-idle');
+      clearTimeout(idleTimerId);
+      idleTimerId = setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          document.body.classList.add('is-idle');
+        }
+      }, 45000);
+    }
+
+    window.addEventListener('touchstart', resetIdleTimer, { passive: true });
+
+    syncAppsFromAndroid();
+    allApps.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    renderHome();
+    renderDrawer();
+    startActiveSession();
+    resetIdleTimer();
+  </script>
+</body>
+</html>
